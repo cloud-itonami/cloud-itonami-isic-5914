@@ -1,0 +1,12 @@
+[{:itonami.blueprint/id "cloud-itonami-isic-5914"
+  :itonami.blueprint/name "Motion Picture Projection Activities"
+  :itonami.blueprint/isic-rev4 "5914"
+  :itonami.blueprint/domain :services/motion-picture-projection
+  :itonami.blueprint/license "AGPL-3.0-or-later"
+  :itonami.blueprint/social-impact [:patron-safety :cultural-access :community-programming :accessibility]
+  :itonami.blueprint/governor :cinema-ops-governor
+  :itonami.blueprint/robotics false
+  :itonami.blueprint/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :itonami.blueprint/status :public-oss
+  :itonami.blueprint/maturity :implemented
+  :db/id -1}]

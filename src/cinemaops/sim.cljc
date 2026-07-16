@@ -1,0 +1,81 @@
+(ns cinemaops.sim
+  "Demo driver -- `clojure -M:run`. Walks a clean screening-record
+  logging request through intake -> advise -> govern -> decide ->
+  approval -> commit at phase 1 (assisted-logging, always approval),
+  then re-runs the same op at phase 3 (supervised-auto, clean + high
+  confidence -> auto-commit), then a screening-schedule request,
+  print-delivery coordination (both auto-commit clean at phase 3),
+  then a patron-safety-concern flag (ALWAYS escalates, at any phase --
+  approve, then commit), then HARD-hold scenarios: an unregistered
+  screening, a screening registered but not yet verified, a proposal
+  whose own `:effect` is not `:propose`, and a proposal that has
+  drifted into the permanently-excluded evacuation-override/
+  projector-control scope."
+  (:require [langgraph.graph :as g]
+            [cinemaops.advisor :as advisor]
+            [cinemaops.store :as store]
+            [cinemaops.operation :as op]))
+
+(defn- exec-op [actor tid request context]
+  (g/run* actor {:request request :context context} {:thread-id tid}))
+
+(defn- approve! [actor tid]
+  (g/run* actor {:approval {:status :approved :by "theater-ops-coordinator-1"}} {:thread-id tid :resume? true}))
+
+(defn -main [& _]
+  (let [db (store/seed-db)
+        coordinator-phase-1 {:actor-id "coord-1" :actor-role :theater-ops-coordinator :phase 1}
+        coordinator-phase-3 {:actor-id "coord-1" :actor-role :theater-ops-coordinator :phase 3}
+        actor (op/build db)]
+
+    (println "== log-screening-record screening-1 (phase 1, escalates -- human approves) ==")
+    (let [r (exec-op actor "t1" {:op :log-screening-record :screening-id "screening-1"
+                                  :patch {:attendance 142 :print-quality "clean"}} coordinator-phase-1)]
+      (println r)
+      (println "-- human theater-ops coordinator approves --")
+      (println (approve! actor "t1")))
+
+    (println "\n== log-screening-record screening-1 (phase 3, clean -- auto-commits) ==")
+    (println (exec-op actor "t2" {:op :log-screening-record :screening-id "screening-1"
+                                  :patch {:attendance 98 :print-quality "clean"}} coordinator-phase-3))
+
+    (println "\n== schedule-screening-operation screening-1 (phase 3, clean -- auto-commits) ==")
+    (println (exec-op actor "t3" {:op :schedule-screening-operation :screening-id "screening-1"
+                                  :patch {:proposed-showtime "2026-07-18T19:00" :screen "Screen 3"}} coordinator-phase-3))
+
+    (println "\n== coordinate-print-delivery screening-1 (phase 3, clean -- auto-commits) ==")
+    (println (exec-op actor "t4" {:op :coordinate-print-delivery :screening-id "screening-1"
+                                  :patch {:dcp-id "DCP-2607-114" :delivery-window "2026-07-16T12:00-15:00"}} coordinator-phase-3))
+
+    (println "\n== flag-patron-safety-concern screening-1 (ALWAYS escalates, even at phase 3) ==")
+    (let [r (exec-op actor "t5" {:op :flag-patron-safety-concern :screening-id "screening-1"
+                                 :patch {:concern "fire alarm briefly sounded near screen 3 exit corridor" :confidence 0.92}} coordinator-phase-3)]
+      (println r)
+      (println "-- human theater-ops coordinator reviews & approves --")
+      (println (approve! actor "t5")))
+
+    (println "\n== log-screening-record screening-99 (unregistered screening -> HARD hold) ==")
+    (println (exec-op actor "t6" {:op :log-screening-record :screening-id "screening-99"
+                                  :patch {:attendance 0}} coordinator-phase-3))
+
+    (println "\n== log-screening-record screening-3 (registered but unverified -> HARD hold) ==")
+    (println (exec-op actor "t7" {:op :log-screening-record :screening-id "screening-3"
+                                  :patch {:attendance 0}} coordinator-phase-3))
+
+    (println "\n== schedule-screening-operation screening-1, advisor attempts direct actuation (:effect :commit) -> HARD hold ==")
+    (let [actor-direct (op/build db {:advisor (reify advisor/Advisor
+                                                (-advise [_ _ req]
+                                                  (assoc (advisor/infer nil req) :effect :commit)))})]
+      (println (exec-op actor-direct "t8" {:op :schedule-screening-operation :screening-id "screening-1"
+                                           :patch {:proposed-showtime "2026-07-19T20:00"}} coordinator-phase-3)))
+
+    (println "\n== log-screening-record screening-1, advisor drifts into evacuation-override/projector-control scope -> HARD hold, permanent ==")
+    (println (exec-op actor "t9" {:op :log-screening-record :screening-id "screening-1"
+                                   :out-of-scope? true
+                                   :patch {}} coordinator-phase-3))
+
+    (println "\n== audit ledger ==")
+    (doseq [f (store/ledger db)] (println f))
+
+    (println "\n== committed coordination log ==")
+    (doseq [r (store/coordination-log db)] (println r))))

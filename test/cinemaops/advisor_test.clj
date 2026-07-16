@@ -1,0 +1,62 @@
+(ns cinemaops.advisor-test
+  "Unit tests of `cinemaops.advisor` proposal generation."
+  (:require [clojure.test :refer [deftest is testing]]
+            [cinemaops.advisor :as adv]
+            [cinemaops.store :as store]))
+
+(def db (store/seed-db))
+
+(deftest propose-screening-record-shape
+  (testing "screening-record proposal has correct shape and fields"
+    (let [p (adv/infer db {:op :log-screening-record
+                           :screening-id "screening-1"
+                           :patch {:attendance 100 :print-quality "clean"}})]
+      (is (= :log-screening-record (:op p)))
+      (is (= "screening-1" (:screening-id p)))
+      (is (= :propose (:effect p)))
+      (is (<= 0 (:confidence p) 1))
+      (is (map? (:value p)))
+      (is (contains? (:value p) :screening-id)))))
+
+(deftest propose-screening-schedule-shape
+  (testing "screening-schedule proposal has correct shape"
+    (let [p (adv/infer db {:op :schedule-screening-operation
+                           :screening-id "screening-2"
+                           :patch {:proposed-showtime "2026-07-20T19:00"}})]
+      (is (= :schedule-screening-operation (:op p)))
+      (is (= "screening-2" (:screening-id p)))
+      (is (= :propose (:effect p))))))
+
+(deftest propose-print-delivery-shape
+  (testing "print-delivery proposal has correct shape"
+    (let [p (adv/infer db {:op :coordinate-print-delivery
+                           :screening-id "screening-1"
+                           :patch {:dcp-id "DCP-1"}})]
+      (is (= :coordinate-print-delivery (:op p)))
+      (is (= :propose (:effect p)))
+      (is (string? (:summary p))))))
+
+(deftest propose-patron-safety-concern-shape
+  (testing "patron-safety-concern proposal always escalates"
+    (let [p (adv/infer db {:op :flag-patron-safety-concern
+                           :screening-id "screening-1"
+                           :patch {:concern "smoke smell reported near exit"}})]
+      (is (= :flag-patron-safety-concern (:op p)))
+      (is (= :propose (:effect p)))
+      (is (string? (:summary p))))))
+
+(deftest all-proposals-effect-is-always-propose
+  (testing "every proposal type has :effect :propose, never direct actuation"
+    (doseq [op [:log-screening-record :schedule-screening-operation
+                :coordinate-print-delivery :flag-patron-safety-concern]]
+      (let [p (adv/infer db {:op op :screening-id "screening-1" :patch {}})]
+        (is (= :propose (:effect p))
+            (str "op " op " must have :effect :propose"))))))
+
+(deftest rationale-string-is-present
+  (testing "every proposal has a rationale explaining the advisor's thinking"
+    (doseq [op [:log-screening-record :schedule-screening-operation
+                :coordinate-print-delivery :flag-patron-safety-concern]]
+      (let [p (adv/infer db {:op op :screening-id "screening-1" :patch {}})]
+        (is (string? (:rationale p))
+            (str "op " op " must have a :rationale string"))))))
