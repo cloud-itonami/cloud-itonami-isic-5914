@@ -27,7 +27,7 @@
   Usage: `clojure -M:dev:render-html [out-file]`
   (default `docs/samples/operator-console.html`)."
   (:require [jp-go-dds.skin]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [cinemaops.advisor :as advisor]
             [cinemaops.governor :as governor]
             [cinemaops.operation :as op]
@@ -224,7 +224,7 @@
   carries one. Returns the case enriched with the real run results."
   [db {:keys [id phase request human advisor-impl advisor-label] :as c}]
   (let [actor (if advisor-impl (op/build db {:advisor advisor-impl}) (op/build db))
-        tid   (str "thread-" (str/lower-case id))
+        tid   (str "thread-" (str/lower id))
         r1    (exec! actor tid request phase)
         paused? (= :interrupted (:status r1))
         r2    (when (and paused? human) (resume! actor tid human))]
@@ -298,7 +298,7 @@
   [runs]
   (let [blobs (->> runs
                    (keep #(get-in % [:final-state :proposal]))
-                   (mapv #(str/lower-case (pr-str %))))]
+                   (mapv #(str/lower (pr-str %))))]
     (mapv (fn [[k label phrase]]
             {:key k :label label :phrase phrase
              :in-governor? (boolean (some #{phrase} governor/scope-excluded-terms))
