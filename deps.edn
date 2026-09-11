@@ -18,7 +18,7 @@
          io.github.kotoba-lang/langchain
          {:local/root "../../kotoba-lang/langchain"}}}
   :run {:main-opts ["-m" "cinemaops.sim"]}
-  ;; clojure -M:dev:render-html [out-file]
+  ;; kbb -M:dev:render-html [out-file]
   ;;   -> docs/samples/operator-console.html を実 actor 実行から再生成する
   :render-html {:main-opts ["-m" "cinemaops.render-html"]}
   :test {:extra-paths ["test"]
