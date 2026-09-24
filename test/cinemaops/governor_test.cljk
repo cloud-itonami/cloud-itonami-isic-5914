@@ -2,7 +2,7 @@
   "Pure unit tests of `cinemaops.governor/check` against hand-built
   proposals -- the fast, focused complement to `governor-contract-
   test`'s full-graph integration coverage."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cinemaops.governor :as gov]
             [cinemaops.advisor :as advisor]
             [cinemaops.store :as store]))

@@ -1,6 +1,6 @@
 (ns cinemaops.advisor-test
   "Unit tests of `cinemaops.advisor` proposal generation."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cinemaops.advisor :as adv]
             [cinemaops.store :as store]))
 
